@@ -119,6 +119,6 @@ func main() {
 			log.Fatalf("Failed to parse address: %v", err)
 		}
 	} else {
-		fmt.Println("The formatted address contains a separator.")
+		fmt.Println("The address is successfully derived from the private key!")
 	}
 }
