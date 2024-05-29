@@ -1,16 +1,13 @@
 package main
 
 import (
-	"crypto/ecdsa"
-	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
 	"strings"
 
 	"github.com/btcsuite/btcutil/bech32"
-	"github.com/ethereum/go-ethereum/crypto"
-	"golang.org/x/crypto/ripemd160"
 )
 
 const addressSep = "-"
@@ -21,8 +18,25 @@ var (
 	errBits8To5    = errors.New("unable to convert address from 8-bit to 5-bit formatting")
 )
 
+// Format takes in a chain prefix, HRP, and byte slice to produce a string for an address.
+func Format(chainIDAlias, hrp string, addr []byte) (string, error) {
+	addrStr, err := FormatBech32(hrp, addr)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s%s%s", chainIDAlias, addressSep, addrStr), nil
+}
+
+// FormatBech32 takes an address's bytes as input and returns a bech32 address.
+func FormatBech32(hrp string, payload []byte) (string, error) {
+	fiveBits, err := bech32.ConvertBits(payload, 8, 5, true)
+	if err != nil {
+		return "", errBits8To5
+	}
+	return bech32.Encode(hrp, fiveBits)
+}
+
 // Parse takes in an address string and returns the corresponding parts.
-// This returns the chain ID alias, bech32 HRP, address bytes, and an error if it occurs.
 func Parse(addrStr string) (string, string, []byte, error) {
 	addressParts := strings.SplitN(addrStr, addressSep, 2)
 	if len(addressParts) < 2 {
@@ -35,18 +49,9 @@ func Parse(addrStr string) (string, string, []byte, error) {
 	return chainID, hrp, addr, err
 }
 
-// Format takes in a chain prefix, HRP, and byte slice to produce a string for an address.
-func Format(chainIDAlias string, hrp string, addr []byte) (string, error) {
-	addrStr, err := FormatBech32(hrp, addr)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%s%s%s", chainIDAlias, addressSep, addrStr), nil
-}
-
 // ParseBech32 takes a bech32 address as input and returns the HRP and data section of a bech32 address.
 func ParseBech32(addrStr string) (string, []byte, error) {
-	rawHRP, decoded, err := bech32.Decode(addrStr)
+	hrp, decoded, err := bech32.Decode(addrStr)
 	if err != nil {
 		return "", nil, err
 	}
@@ -54,71 +59,35 @@ func ParseBech32(addrStr string) (string, []byte, error) {
 	if err != nil {
 		return "", nil, errBits5To8
 	}
-	return rawHRP, addrBytes, nil
-}
-
-// FormatBech32 takes an address's bytes as input and returns a bech32 address.
-func FormatBech32(hrp string, payload []byte) (string, error) {
-	fiveBits, err := bech32.ConvertBits(payload, 8, 5, true)
-	if err != nil {
-		return "", errBits8To5
-	}
-	return bech32.Encode(hrp, fiveBits)
+	return hrp, addrBytes, nil
 }
 
 func main() {
-	// Example private key from MetaMask (in hex format without 0x)
-	privateKeyHex := "PRIVATE_KEY_HERE"
+	// Example Ethereum address (without the 0x prefix)
+	ethereumAddressHex := "1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p7q8r9s"
 
-	// Decode the private key from hex
-	privateKey, err := crypto.HexToECDSA(privateKeyHex)
+	// Decode the hex string to bytes
+	ethereumAddressBytes, err := hex.DecodeString(ethereumAddressHex)
 	if err != nil {
-		log.Fatalf("Failed to decode private key: %v", err)
+		log.Fatalf("Failed to decode Ethereum address: %v", err)
 	}
 
-	// Derive the public key from the private key
-	publicKey := privateKey.Public().(*ecdsa.PublicKey)
-
-	// Convert the public key to the Ethereum address format
-	pubBytes := crypto.FromECDSAPub(publicKey)
-	hash := sha256.Sum256(pubBytes[1:])
-	ripemd160Hasher := ripemd160.New()
-	ripemd160Hasher.Write(hash[:])
-	publicKeyHash := ripemd160Hasher.Sum(nil)
-
-	// Convert the address to 5-bit groups
-	data, err := bech32.ConvertBits(publicKeyHash, 8, 5, true)
-	if err != nil {
-		log.Fatalf("Failed to convert bits: %v", err)
-	}
-
-	// Encode the address using Bech32 with the specified HRP
+	// Encode the Ethereum address to Bech32 with a specified HRP
 	hrp := "cryft"
-	encodedAddress, err := bech32.Encode(hrp, data)
+	encodedAddress, err := FormatBech32(hrp, ethereumAddressBytes)
 	if err != nil {
 		log.Fatalf("Failed to encode address: %v", err)
 	}
 
-	// Format the address with chain ID alias
-	chainIDAlias := "chain"
-	formattedAddress, err := Format(chainIDAlias, hrp, publicKeyHash)
-	if err != nil {
-		log.Fatalf("Failed to format address: %v", err)
-	}
-
 	// Print the resulting Bech32 address
 	fmt.Printf("Bech32 address: %s\n", encodedAddress)
-	fmt.Printf("Formatted address: %s\n", formattedAddress)
 
-	// Parse the formatted address to check for separator
-	_, _, _, err = Parse(formattedAddress)
-	if err != nil {
-		if err == ErrNoSeparator {
-			fmt.Println("The formatted address does not contain a separator.")
-		} else {
-			log.Fatalf("Failed to parse address: %v", err)
-		}
-	} else {
-		fmt.Println("The address is successfully derived from the private key!")
+	// Attempt to parse the address to check its validity
+	chainID, hrpRecovered, _, parseErr := Parse(fmt.Sprintf("chain%s%s", addressSep, encodedAddress))
+	if parseErr != nil {
+		log.Fatalf("Failed to parse address: %v", parseErr)
 	}
+
+	// Confirm that the parsing went correctly
+	fmt.Printf("Parsed successfully with Chain ID: %s and HRP: %s\n", chainID, hrpRecovered)
 }
