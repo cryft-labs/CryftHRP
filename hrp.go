@@ -89,5 +89,5 @@ func main() {
 	}
 
 	// Confirm that the parsing went correctly
-	fmt.Printf("Parsed successfully with Chain ID: %s and HRP: %s\n", chainID, hrpRecovered)
+	fmt.Printf("Parsed successfully for your %s with HRP: %s\n", chainID, hrpRecovered)
 }
