@@ -64,7 +64,7 @@ func ParseBech32(addrStr string) (string, []byte, error) {
 
 func main() {
 	// Example Ethereum address (without the 0x prefix)
-	ethereumAddressHex := "1a2b3c4d5e6f7g8h9i0j1k2l3m4n5o6p7q8r9s"
+	ethereumAddressHex := "EcaBC9480D5a8CdbBb509ac697adeEcB3356dc74"
 
 	// Decode the hex string to bytes
 	ethereumAddressBytes, err := hex.DecodeString(ethereumAddressHex)
@@ -89,5 +89,5 @@ func main() {
 	}
 
 	// Confirm that the parsing went correctly
-	fmt.Printf("Parsed successfully with Chain ID: %s and HRP: %s\n", chainID, hrpRecovered)
+	fmt.Printf("Parsed successfully with HRP: %s\n", chainID, hrpRecovered)
 }
